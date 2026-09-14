@@ -1,0 +1,102 @@
+{
+  "indexVersion": 1,
+  "name": "佳速API Plugins",
+  "plugins": [
+    {
+      "key": "jiasuapi",
+      "name": "佳速API",
+      "icon": "text:佳速",
+      "website": "https://ai.jiasuapi.com/",
+      "description": {
+        "en": "JiasuAPI image & video media platform. Official site: https://ai.jiasuapi.com/",
+        "zh": "佳速API中转平台（图片、视频中转平台）。官方地址：https://ai.jiasuapi.com/"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/jiasuapi/v1/videos/generations",
+          "type": "submit",
+          "action": "video",
+          "decode": "decodeVideoSubmit",
+          "render": "taskCreatedJsapi",
+          "models": [
+            "seedance-2.0-900",
+            "seedance-2.0-933",
+            "seedance-2.5-900",
+            "seedance-2.5-101010",
+            "seedance-2.5-303030",
+            "sd-2.0-as",
+            "sd-2.0-js",
+            "sd-2.5-js"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/jiasuapi/v1/images/create",
+          "type": "submit",
+          "action": "image",
+          "decode": "decodeImageSubmit",
+          "render": "taskCreatedJsapi",
+          "models": [
+            "jimeng-5.0",
+            "k1-gpt-image-2.5",
+            "gpt-image-2.5--sunburst-1k"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/jiasuapi/v1/videos/tasks/:task_id",
+          "type": "query",
+          "render": "taskStatusJsapi",
+          "taskIdParam": "task_id"
+        },
+        {
+          "method": "GET",
+          "path": "/jiasuapi/v1/images/tasks/:task_id",
+          "type": "query",
+          "render": "taskStatusJsapi",
+          "taskIdParam": "task_id"
+        }
+      ],
+      "protocols": [
+        {
+          "name": "openai_video",
+          "models": [
+            "seedance-2.0-900",
+            "seedance-2.0-933",
+            "seedance-2.5-900",
+            "seedance-2.5-101010",
+            "seedance-2.5-303030",
+            "sd-2.0-as",
+            "sd-2.0-js",
+            "sd-2.5-js"
+          ]
+        }
+      ],
+      "models": [
+        "seedance-2.0-900",
+        "seedance-2.0-933",
+        "seedance-2.5-900",
+        "seedance-2.5-101010",
+        "seedance-2.5-303030",
+        "sd-2.0-as",
+        "sd-2.0-js",
+        "sd-2.5-js",
+        "jimeng-5.0",
+        "k1-gpt-image-2.5",
+        "gpt-image-2.5--sunburst-1k"
+      ],
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "path": "plugins/tasks/jiasuapi/1.0.0/plugin.js",
+          "sha256": "505fb0366f9ff7c9d7aca33fe79aa5e9621e9f4d9f988fc5edbd62435b53ec9a",
+          "minApiVersion": 1,
+          "kind": "task",
+          "baseUrl": "https://ai.jiasuapi.com"
+        }
+      ]
+    }
+  ]
+}
