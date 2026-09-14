@@ -112,6 +112,49 @@ JIASU_API_KEY=sk-... node scripts/sync-models.mjs --version 1.0.2 \
 | `GET` | `/jiasuapi/v1/videos/tasks/:task_id` | `GET /v1/videos/tasks/:task_id` |
 | `GET` | `/jiasuapi/v1/images/tasks/:task_id` | `GET /v1/images/tasks/:task_id` |
 
+## 视频参数映射（调用方 → 佳速）
+
+下游无论走主机 jsapi（`POST /v1/video/generations`）、`openai_video`（`POST /v1/videos`）还是原生 `/jiasuapi/...`，最终都会打到佳速 `POST /v1/video/generations`。下表只列**调用方请求字段**与佳速接受字段的对应关系（与官方公开参数一致）。
+
+### 必填
+
+| 调用方字段 | 佳速字段 | 说明 |
+| --- | --- | --- |
+| `model` | `model` | 视频模型 id（如 `seedance-2.5-101010`） |
+| `prompt` | `prompt` | 文本提示词；可用 `@图片N` / `@视频N` / `@音频N` 或自定义素材名引用 |
+
+### 可选
+
+| 调用方字段（含兼容别名） | 佳速字段 | 说明 |
+| --- | --- | --- |
+| `duration` 或 `seconds` | `duration` | 秒数；`seconds` 为 OpenAI Videos / Sora 兼容写法。默认由上游按模型处理（常见默认 `5`）；`2.0-*` 约 4–15，`2.5-*` 约 4–30 |
+| `ratio` 或 `aspect_ratio` | `ratio` | `16:9` / `9:16` / `1:1`；别名统一写成佳速的 `ratio` |
+| `resolution` 或 `video_resolution` | `resolution` | `480p` / `720p` / `1080p`；默认常见为 `720p` |
+| `images`、`image_urls`、`image`、`input_reference` | `images` | URL 字符串，或 `{url, name?, type?}`。`type`：`first_frame` / `end_frame`（入站也接受 `last_frame`）。无 `type` 为参考图。`input_reference` / 单张 `image` 为 Sora 兼容参考图 |
+| `videos` | `videos` | URL 或 `{url, name?}` |
+| `audios` | `audios` | URL 或 `{url, name?}`；勿与 `images[].type` 首尾帧同时使用 |
+| `materials` | `materials` | 可选 `[{type, url, name?}]` |
+| `face` | `face` | 可选。`{"enabled":true,"mode":"light"}`（或 `heavy`），或 `{"enabled":false}`；省略则走服务端默认处理 |
+
+以上字段也可放在 `metadata` 对象内（如 `metadata.ratio`、`metadata.images`），效果与顶层相同。
+
+### openai_video（`POST /v1/videos`）速查
+
+| OpenAI / Sora 常见字段 | 映射到佳速 |
+| --- | --- |
+| `model` | `model` |
+| `prompt` | `prompt` |
+| `seconds` | `duration` |
+| `input_reference`（URL 或文件） | `images` |
+| `ratio` / `aspect_ratio` | `ratio` |
+| `resolution` | `resolution` |
+
+说明：OpenAI Videos 的像素 `size`（如 `1280x720`）**不是**佳速视频字段；请直接传 `ratio` / `aspect_ratio` 与 `resolution`，不要只传 `size`。
+
+### 不要传的顶层字段
+
+不要传 `first_frame_url` / `end_frame_url` / `start_frame` / `end_frame` / `function_mode`；首尾帧请用 `images[].type`（`first_frame` / `end_frame`）。
+
 ## 调用示例
 
 视频（主机 jsapi）：
