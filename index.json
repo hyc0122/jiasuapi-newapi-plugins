@@ -20,14 +20,15 @@
           "decode": "decodeVideoSubmit",
           "render": "taskCreatedJsapi",
           "models": [
+            "sd-2.0-720",
+            "sd-2.0-720-fast",
+            "sd-2.0-933-720-fast-原生真人",
+            "sd-2.0-933-720-满血原生真人",
             "seedance-2.0-900",
             "seedance-2.0-933",
-            "seedance-2.5-900",
             "seedance-2.5-101010",
-            "seedance-2.5-303030",
-            "sd-2.0-as",
-            "sd-2.0-js",
-            "sd-2.5-js"
+            "seedance-2.5-301010",
+            "seedance-2.5-900"
           ]
         },
         {
@@ -38,9 +39,8 @@
           "decode": "decodeImageSubmit",
           "render": "taskCreatedJsapi",
           "models": [
-            "jimeng-5.0",
-            "k1-gpt-image-2.5",
-            "gpt-image-2.5--sunburst-1k"
+            "gpt-image-2.5-1k",
+            "gpt-image-2.5-sunburst-1k"
           ]
         },
         {
@@ -62,36 +62,45 @@
         {
           "name": "openai_video",
           "models": [
+            "sd-2.0-720",
+            "sd-2.0-720-fast",
+            "sd-2.0-933-720-fast-原生真人",
+            "sd-2.0-933-720-满血原生真人",
             "seedance-2.0-900",
             "seedance-2.0-933",
-            "seedance-2.5-900",
             "seedance-2.5-101010",
-            "seedance-2.5-303030",
-            "sd-2.0-as",
-            "sd-2.0-js",
-            "sd-2.5-js"
+            "seedance-2.5-301010",
+            "seedance-2.5-900"
           ]
         }
       ],
       "models": [
+        "gpt-image-2.5-1k",
+        "gpt-image-2.5-sunburst-1k",
+        "sd-2.0-720",
+        "sd-2.0-720-fast",
+        "sd-2.0-933-720-fast-原生真人",
+        "sd-2.0-933-720-满血原生真人",
         "seedance-2.0-900",
         "seedance-2.0-933",
-        "seedance-2.5-900",
         "seedance-2.5-101010",
-        "seedance-2.5-303030",
-        "sd-2.0-as",
-        "sd-2.0-js",
-        "sd-2.5-js",
-        "jimeng-5.0",
-        "k1-gpt-image-2.5",
-        "gpt-image-2.5--sunburst-1k"
+        "seedance-2.5-301010",
+        "seedance-2.5-900"
       ],
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
         {
           "version": "1.0.0",
           "path": "plugins/tasks/jiasuapi/1.0.0/plugin.js",
           "sha256": "505fb0366f9ff7c9d7aca33fe79aa5e9621e9f4d9f988fc5edbd62435b53ec9a",
+          "minApiVersion": 1,
+          "kind": "task",
+          "baseUrl": "https://ai.jiasuapi.com"
+        },
+        {
+          "version": "1.0.1",
+          "path": "plugins/tasks/jiasuapi/1.0.1/plugin.js",
+          "sha256": "2d788b27451975f3a1a91c5bfd88039e492e7bf81bc6996f52e154400c9e54cc",
           "minApiVersion": 1,
           "kind": "task",
           "baseUrl": "https://ai.jiasuapi.com"

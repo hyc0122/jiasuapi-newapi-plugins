@@ -1,0 +1,43 @@
+{
+  "syncedAt": "2026-09-14T04:54:41.121Z",
+  "base": "https://ai.jiasuapi.com",
+  "version": "1.0.1",
+  "source": "synced 10 from GET https://ai.jiasuapi.com/api/pricing (fallback; /v1/models: 401 Unauthorized (set JIASU_API_KEY for full /v1/models))",
+  "counts": {
+    "meta": 11,
+    "video": 9,
+    "image": 2,
+    "unknown": 0
+  },
+  "models": [
+    "gpt-image-2.5-1k",
+    "gpt-image-2.5-sunburst-1k",
+    "sd-2.0-720",
+    "sd-2.0-720-fast",
+    "sd-2.0-933-720-fast-原生真人",
+    "sd-2.0-933-720-满血原生真人",
+    "seedance-2.0-900",
+    "seedance-2.0-933",
+    "seedance-2.5-101010",
+    "seedance-2.5-301010",
+    "seedance-2.5-900"
+  ],
+  "video": [
+    "sd-2.0-720",
+    "sd-2.0-720-fast",
+    "sd-2.0-933-720-fast-原生真人",
+    "sd-2.0-933-720-满血原生真人",
+    "seedance-2.0-900",
+    "seedance-2.0-933",
+    "seedance-2.5-101010",
+    "seedance-2.5-301010",
+    "seedance-2.5-900"
+  ],
+  "image": [
+    "gpt-image-2.5-1k",
+    "gpt-image-2.5-sunburst-1k"
+  ],
+  "unknown": [],
+  "sha256": "2d788b27451975f3a1a91c5bfd88039e492e7bf81bc6996f52e154400c9e54cc",
+  "sunburst": true
+}
