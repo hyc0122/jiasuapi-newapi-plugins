@@ -2,16 +2,30 @@
 /**
  * Sync model IDs into plugins/tasks/jiasuapi/<ver>/plugin.js and index.json.
  *
- * Sources (in order):
+ * Sources (UNION):
  *   1. GET {BASE}/v1/models  (Authorization: Bearer $JIASU_API_KEY when set)
- *   2. Fallback: GET {BASE}/api/pricing  (public card list)
+ *      Note: /v1/models is auth-scoped to the token's group; often incomplete.
+ *   2. Optional --extra-models-file (one model_name per line) — typically a
+ *      snapshot from platform Postgres: SELECT model_name FROM models WHERE deleted_at IS NULL
+ *   3. Optional GET {BASE}/api/pricing when --include-pricing is set (or as
+ *      fallback if neither v1 nor extra file yielded models)
  *
- * Always force-includes: gpt-image-2.5-sunburst-1k
- * Always strips wrong id: gpt-image-2.5--sunburst-1k
+ * Filters:
+ *   - Always force-include: gpt-image-2.5-sunburst-1k
+ *   - Always strip wrong id: gpt-image-2.5--sunburst-1k
+ *   - Always exclude public non-relay product: face-style
+ *   - Exclude private variants matching *-不重试 or *-KiLig unless the same
+ *     id appears in the token's /v1/models response
+ *
+ * Env:
+ *   JIASU_API_KEY   Bearer token for GET /v1/models (do not commit).
+ *                   Operators may also: export JIASU_API_KEY="$(tr -d '\\n' < .sync-token)"
+ *                   (.sync-token is gitignored; treat as incomplete / token-scoped.)
  *
  * Usage:
- *   JIASU_API_KEY=sk-... node scripts/sync-models.mjs
- *   node scripts/sync-models.mjs --base https://ai.jiasuapi.com --version 1.0.1
+ *   JIASU_API_KEY=sk-... node scripts/sync-models.mjs --version 1.0.2 \
+ *     --extra-models-file scripts/db-models.snapshot.txt
+ *   node scripts/sync-models.mjs --base https://ai.jiasuapi.com --version 1.0.2 --include-pricing
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -21,14 +35,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 
 const FORCE_INCLUDE = ["gpt-image-2.5-sunburst-1k"];
-const FORCE_EXCLUDE = ["gpt-image-2.5--sunburst-1k"];
+const FORCE_EXCLUDE = ["gpt-image-2.5--sunburst-1k", "face-style"];
 
 function parseArgs(argv) {
-  const out = { base: "https://ai.jiasuapi.com", version: "1.0.1" };
+  const out = {
+    base: "https://ai.jiasuapi.com",
+    version: "1.0.2",
+    extraModelsFile: "",
+    includePricing: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--base") out.base = String(argv[++i] || "").replace(/\/+$/, "");
-    else if (a === "--version") out.version = String(argv[++i] || "1.0.1");
+    else if (a === "--version") out.version = String(argv[++i] || "1.0.2");
+    else if (a === "--extra-models-file") out.extraModelsFile = String(argv[++i] || "");
+    else if (a === "--include-pricing") out.includePricing = true;
     else if (a === "--help" || a === "-h") out.help = true;
   }
   return out;
@@ -40,6 +61,18 @@ function classifyModel(id, hint = {}) {
   const endpoints = []
     .concat(hint.supported_endpoint_types || [])
     .concat(hint.endpoints || [])
+    .map((x) => {
+      try {
+        // endpoints may be a JSON string from DB dumps
+        if (typeof x === "string" && x.trim().startsWith("[")) {
+          return JSON.parse(x);
+        }
+      } catch {
+        /* ignore */
+      }
+      return x;
+    })
+    .flat()
     .map((x) => String(x).toLowerCase());
   const tags = String(hint.tags || "").toLowerCase();
   const owned = String(hint.owned_by || hint.owner_by || "").toLowerCase();
@@ -80,7 +113,14 @@ function classifyModel(id, hint = {}) {
   if (/video/i.test(owned) || /image/i.test(owned)) {
     return /image/i.test(owned) ? "image" : "video";
   }
+  // tags like image2.5
+  if (/image/i.test(tags)) return "image";
+  if (/seedance|video/i.test(tags)) return "video";
   return "unknown";
+}
+
+function isPrivateVariant(id) {
+  return /(?:-不重试|-KiLig)$/.test(String(id || ""));
 }
 
 async function fetchJson(url, headers = {}) {
@@ -102,14 +142,16 @@ async function fetchFromV1Models(base, apiKey) {
   }
   const { ok, status, body } = await fetchJson(base + "/v1/models", headers);
   if (!ok) {
-    return { ok: false, status, models: [], error: body };
+    return { ok: false, status, models: [], error: body, ids: [] };
   }
   const data = (body && body.data) || [];
   const models = [];
+  const ids = [];
   for (const item of data) {
     if (!item || typeof item !== "object") continue;
     const id = String(item.id || item.model || "").trim();
     if (!id) continue;
+    ids.push(id);
     models.push({
       id,
       kind: classifyModel(id, item),
@@ -117,7 +159,7 @@ async function fetchFromV1Models(base, apiKey) {
       hint: item,
     });
   }
-  return { ok: true, status, models, source: "v1/models" };
+  return { ok: true, status, models, source: "v1/models", ids };
 }
 
 async function fetchFromPricing(base) {
@@ -143,12 +185,73 @@ async function fetchFromPricing(base) {
   return { ok: true, status, models, source: "api/pricing" };
 }
 
-function mergeModels(fetched) {
-  const byId = new Map();
-  for (const row of fetched) {
-    if (FORCE_EXCLUDE.includes(row.id)) continue;
-    if (!byId.has(row.id)) byId.set(row.id, row);
+function loadExtraModelsFile(filePath) {
+  if (!filePath) return { models: [], path: "" };
+  const abs = path.isAbsolute(filePath) ? filePath : path.join(ROOT, filePath);
+  if (!fs.existsSync(abs)) {
+    throw new Error("extra models file not found: " + abs);
   }
+  const lines = fs.readFileSync(abs, "utf8").split(/\r?\n/);
+  const models = [];
+  for (const line of lines) {
+    const raw = line.trim();
+    if (!raw || raw.startsWith("#")) continue;
+    // Support "name|endpoints|tags" snapshots from psql -F '|'
+    const parts = raw.split("|");
+    const id = parts[0].trim();
+    if (!id) continue;
+    let endpoints = [];
+    let tags = "";
+    if (parts.length >= 2 && parts[1]) {
+      try {
+        endpoints = JSON.parse(parts[1]);
+      } catch {
+        endpoints = [parts[1]];
+      }
+    }
+    if (parts.length >= 3) tags = parts[2] || "";
+    models.push({
+      id,
+      kind: classifyModel(id, { endpoints, tags }),
+      source: "extra-file",
+      hint: { endpoints, tags },
+    });
+  }
+  return { models, path: abs };
+}
+
+function mergeModels(fetched, v1AllowIds) {
+  const allow = new Set(v1AllowIds || []);
+  const byId = new Map();
+  const skipped = [];
+
+  for (const row of fetched) {
+    const id = row.id;
+    if (FORCE_EXCLUDE.includes(id)) {
+      skipped.push({ id, reason: "force-exclude" });
+      continue;
+    }
+    if (id.includes("--") && /sunburst/i.test(id)) {
+      skipped.push({ id, reason: "double-dash-sunburst" });
+      continue;
+    }
+    if (isPrivateVariant(id) && !allow.has(id)) {
+      skipped.push({ id, reason: "private-variant-not-in-v1" });
+      continue;
+    }
+    if (!byId.has(id)) byId.set(id, row);
+    else {
+      // Prefer richer classification: if existing unknown and new known, upgrade
+      const cur = byId.get(id);
+      if (cur.kind === "unknown" && row.kind !== "unknown") {
+        cur.kind = row.kind;
+        cur.hint = row.hint;
+      }
+      // Prefer openai-video hint over generic openai for seedance/sd
+      if (row.source === "v1/models") cur.source = "v1/models+" + (cur.source || "");
+    }
+  }
+
   for (const id of FORCE_INCLUDE) {
     if (FORCE_EXCLUDE.includes(id)) continue;
     if (!byId.has(id)) {
@@ -158,7 +261,6 @@ function mergeModels(fetched) {
       cur.kind = "image";
     }
   }
-  // Drop wrong double-dash if somehow present under another key
   byId.delete("gpt-image-2.5--sunburst-1k");
 
   const all = [...byId.values()].sort((a, b) => a.id.localeCompare(b.id));
@@ -166,7 +268,7 @@ function mergeModels(fetched) {
   const image = all.filter((m) => m.kind === "image").map((m) => m.id);
   const unknown = all.filter((m) => m.kind === "unknown").map((m) => m.id);
   const meta = all.map((m) => m.id);
-  return { all, video, image, unknown, meta };
+  return { all, video, image, unknown, meta, skipped };
 }
 
 function jsStringArray(ids, indent = 4) {
@@ -196,7 +298,6 @@ function replaceProtocolModels(src, videoIds) {
 }
 
 function replaceRouteModels(src, action, ids) {
-  // Match the submit route block for video or image by action field nearby
   const re =
     action === "video"
       ? /(path: "\/jiasuapi\/v1\/videos\/generations",[\s\S]*?models: )(\[[\s\S]*?\])(,\s*\},)/
@@ -236,7 +337,6 @@ function updateIndexJson(indexPath, version, groups, pluginRelPath, sha256) {
   plugin.models = groups.meta.slice();
   plugin.latest = version;
 
-  // Update route model lists on the card
   for (const route of plugin.routes || []) {
     if (route.path === "/jiasuapi/v1/videos/generations") route.models = groups.video.slice();
     if (route.path === "/jiasuapi/v1/images/create") route.models = groups.image.slice();
@@ -272,40 +372,69 @@ async function sha256File(filePath) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
-    console.log(`Usage: node scripts/sync-models.mjs [--base URL] [--version X.Y.Z]
-Env: JIASU_API_KEY (optional; required for authenticated /v1/models)`);
+    console.log(`Usage: node scripts/sync-models.mjs [options]
+Options:
+  --base URL                 Default https://ai.jiasuapi.com
+  --version X.Y.Z            Default 1.0.2
+  --extra-models-file PATH   DB/catalog snapshot (one id per line, or id|endpoints|tags)
+  --include-pricing          Also UNION public /api/pricing cards
+Env:
+  JIASU_API_KEY              Bearer for authenticated /v1/models (token-scoped; incomplete)
+                             e.g. export JIASU_API_KEY="$(tr -d '\\n' < .sync-token)"`);
     process.exit(0);
   }
 
   const apiKey = (process.env.JIASU_API_KEY || "").trim();
-  let fetched = [];
-  let sourceNote = "";
+  const fetched = [];
+  const notes = [];
+  let v1Ids = [];
 
   const v1 = await fetchFromV1Models(args.base, apiKey);
   if (v1.ok && v1.models.length) {
-    fetched = v1.models;
-    sourceNote = `synced ${fetched.length} from GET ${args.base}/v1/models`;
+    fetched.push(...v1.models);
+    v1Ids = v1.ids.slice();
+    notes.push(`v1/models=${v1.models.length}`);
   } else {
     const reason =
-      v1.status === 401
-        ? "401 Unauthorized (set JIASU_API_KEY for full /v1/models)"
-        : `HTTP ${v1.status}`;
-    console.warn(`[sync-models] /v1/models failed: ${reason}; falling back to /api/pricing`);
-    const pricing = await fetchFromPricing(args.base);
-    if (!pricing.ok) {
-      console.error("[sync-models] /api/pricing also failed:", pricing.status, pricing.error);
-      process.exit(1);
-    }
-    fetched = pricing.models;
-    sourceNote = `synced ${fetched.length} from GET ${args.base}/api/pricing (fallback; /v1/models: ${reason})`;
+      !apiKey
+        ? "no JIASU_API_KEY"
+        : v1.status === 401
+          ? "401 Unauthorized"
+          : `HTTP ${v1.status}`;
+    notes.push(`v1/models skipped (${reason})`);
   }
 
-  const groups = mergeModels(fetched);
-  console.log("[sync-models]", sourceNote);
+  if (args.extraModelsFile) {
+    const extra = loadExtraModelsFile(args.extraModelsFile);
+    fetched.push(...extra.models);
+    notes.push(`extra-file=${extra.models.length} (${path.relative(ROOT, extra.path)})`);
+  }
+
+  if (args.includePricing || fetched.length === 0) {
+    const pricing = await fetchFromPricing(args.base);
+    if (pricing.ok) {
+      fetched.push(...pricing.models);
+      notes.push(`api/pricing=${pricing.models.length}`);
+    } else if (fetched.length === 0) {
+      console.error("[sync-models] no models from v1/extra/pricing:", pricing.status, pricing.error);
+      process.exit(1);
+    } else {
+      notes.push(`api/pricing failed HTTP ${pricing.status}`);
+    }
+  }
+
+  const groups = mergeModels(fetched, v1Ids);
+  console.log("[sync-models] sources:", notes.join("; "));
   console.log(
     `[sync-models] meta=${groups.meta.length} video=${groups.video.length} image=${groups.image.length} unknown=${groups.unknown.length}`
   );
   console.log("[sync-models] force-include ok:", groups.meta.includes("gpt-image-2.5-sunburst-1k"));
+  if (groups.skipped.length) {
+    console.log(
+      "[sync-models] skipped:",
+      groups.skipped.map((s) => s.id + "(" + s.reason + ")").join(", ")
+    );
+  }
   if (groups.unknown.length) {
     console.log("[sync-models] unknown (meta only):", groups.unknown.join(", "));
   }
@@ -321,12 +450,11 @@ Env: JIASU_API_KEY (optional; required for authenticated /v1/models)`);
   const digest = await sha256File(pluginPath);
   updateIndexJson(path.join(ROOT, "index.json"), args.version, groups, pluginRel, digest);
 
-  // Write a small manifest for release notes / CI
   const manifest = {
     syncedAt: new Date().toISOString(),
     base: args.base,
     version: args.version,
-    source: sourceNote,
+    source: notes.join("; "),
     counts: {
       meta: groups.meta.length,
       video: groups.video.length,
@@ -337,6 +465,7 @@ Env: JIASU_API_KEY (optional; required for authenticated /v1/models)`);
     video: groups.video,
     image: groups.image,
     unknown: groups.unknown,
+    skipped: groups.skipped,
     sha256: digest,
     sunburst: groups.meta.includes("gpt-image-2.5-sunburst-1k"),
   };
@@ -346,6 +475,7 @@ Env: JIASU_API_KEY (optional; required for authenticated /v1/models)`);
   );
   console.log("[sync-models] wrote", pluginRel, "sha256=", digest);
   console.log("[sync-models] updated index.json latest ->", args.version);
+  console.log("[sync-models] models:\n" + groups.meta.map((m) => "  - " + m).join("\n"));
 }
 
 main().catch((err) => {

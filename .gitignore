@@ -1,0 +1,11 @@
+# Local sync credentials (token-scoped; never commit)
+.sync-token
+*.sync-token
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+*.swp
+*~

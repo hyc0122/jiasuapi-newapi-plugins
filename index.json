@@ -40,7 +40,8 @@
           "render": "taskCreatedJsapi",
           "models": [
             "gpt-image-2.5-1k",
-            "gpt-image-2.5-sunburst-1k"
+            "gpt-image-2.5-sunburst-1k",
+            "jimeng-5.0"
           ]
         },
         {
@@ -77,6 +78,7 @@
       "models": [
         "gpt-image-2.5-1k",
         "gpt-image-2.5-sunburst-1k",
+        "jimeng-5.0",
         "sd-2.0-720",
         "sd-2.0-720-fast",
         "sd-2.0-933-720-fast-原生真人",
@@ -87,7 +89,7 @@
         "seedance-2.5-301010",
         "seedance-2.5-900"
       ],
-      "latest": "1.0.1",
+      "latest": "1.0.2",
       "versions": [
         {
           "version": "1.0.0",
@@ -101,6 +103,14 @@
           "version": "1.0.1",
           "path": "plugins/tasks/jiasuapi/1.0.1/plugin.js",
           "sha256": "2d788b27451975f3a1a91c5bfd88039e492e7bf81bc6996f52e154400c9e54cc",
+          "minApiVersion": 1,
+          "kind": "task",
+          "baseUrl": "https://ai.jiasuapi.com"
+        },
+        {
+          "version": "1.0.2",
+          "path": "plugins/tasks/jiasuapi/1.0.2/plugin.js",
+          "sha256": "55e2eb3bae30d52bff9f9632ec5c366d7974de683874bad334232625f4da413d",
           "minApiVersion": 1,
           "kind": "task",
           "baseUrl": "https://ai.jiasuapi.com"

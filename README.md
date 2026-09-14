@@ -4,7 +4,7 @@
 
 - 官方地址：https://ai.jiasuapi.com/
 - 插件 key：`jiasuapi`
-- 当前版本：`1.0.1`
+- 当前版本：`1.0.2`
 - 描述：佳速API中转平台（图片、视频中转平台）。官方地址：https://ai.jiasuapi.com/
 - 市场源 `index.json`（raw）：
 
@@ -23,9 +23,9 @@ https://raw.githubusercontent.com/hyc0122/jiasuapi-newapi-plugins/main/index.jso
 
 ### 2. 安装插件
 
-1. 在市场中找到 **佳速API**（`jiasuapi@1.0.1`）
+1. 在市场中找到 **佳速API**（`jiasuapi@1.0.2`）
 2. 安装并启用
-3. 也可手动上传本仓库 `plugins/tasks/jiasuapi/1.0.1/plugin.js`
+3. 也可手动上传本仓库 `plugins/tasks/jiasuapi/1.0.2/plugin.js`
 
 ### 3. 创建 Task Plugin 渠道
 
@@ -39,22 +39,40 @@ https://raw.githubusercontent.com/hyc0122/jiasuapi-newapi-plugins/main/index.jso
 
 ## 模型列表
 
-**以佳速公开接口 `GET /v1/models` 为准**（需带佳速 Base URL + API Key）。本版额外保证注册：
+### 重要：`GET /v1/models` 是按 Key 鉴权限流的
 
-- `gpt-image-2.5-sunburst-1k`（单连字符；已移除错误的 `gpt-image-2.5--sunburst-1k`）
+佳速 `GET /v1/models` **只返回当前 Bearer Token 所属分组 / 额度能用的模型**，不是全站目录。同一站点不同 Key 可能看到 8 个、十几个或更多，且 **不一定包含** `gpt-image-2.5-sunburst-1k`。
 
-插件包内的 `meta.models` 只是发布时的快照，便于市场卡片展示与渠道勾选；线上增减模型请以 `GET /v1/models` 结果为准，并可用仓库脚本重新同步后发新版：
-
-```bash
-# 优先拉 /v1/models；无 Key 或 401 时回退公开 /api/pricing，并强制写入 sunburst
-JIASU_API_KEY=sk-... node scripts/sync-models.mjs --version 1.0.1
-```
-
-查询示例：
+**运营方 / 调用方请用自己的 Key 查询自己能调的模型：**
 
 ```bash
 curl -sS "https://ai.jiasuapi.com/v1/models" \
   -H "Authorization: Bearer $JIASU_API_KEY"
+```
+
+### 市场插件包内的列表如何生成
+
+`meta.models`（及路由 / 协议子集）是发布时的快照，便于市场卡片展示与渠道勾选。本版采用：
+
+1. Token 的 `GET /v1/models`（鉴权范围，可能不完整）
+2. **UNION** 平台目录（Postgres `models` 表 / 可选公开 `/api/pricing`）
+3. 排除非中转公开产品：`face-style`
+4. 排除私有变体 `*-不重试`、`*-KiLig`（除非该 id 出现在 Token 的 `/v1/models` 中）
+5. **强制写入** `gpt-image-2.5-sunburst-1k`（单连字符）；已移除错误的 `gpt-image-2.5--sunburst-1k`
+
+因此：**市场插件列表 = 目录 ∪ 强制 sunburst（经上述过滤）**；**你账号实际可调模型 = 你自己的 `GET /v1/models`**。
+
+同步脚本：
+
+```bash
+# JIASU_API_KEY：Bearer，用于鉴权 /v1/models（勿提交仓库；可从本地 .sync-token 导出）
+# export JIASU_API_KEY="$(tr -d '\n' < .sync-token)"
+#
+# --extra-models-file：平台目录快照（一行一个 model_name，或 name|endpoints|tags）
+# --include-pricing：额外 UNION 公开 /api/pricing
+JIASU_API_KEY=sk-... node scripts/sync-models.mjs --version 1.0.2 \
+  --extra-models-file scripts/db-models.snapshot.txt \
+  --include-pricing
 ```
 
 ## 三层路径说明
@@ -134,19 +152,22 @@ curl -sS -X POST "$YOUR_NEW_API/v1/images/create" \
 index.json
 README.md
 scripts/sync-models.mjs
+scripts/db-models.snapshot.txt
+scripts/last-sync.json
 plugins/tasks/jiasuapi/1.0.0/plugin.js
 plugins/tasks/jiasuapi/1.0.1/plugin.js
+plugins/tasks/jiasuapi/1.0.2/plugin.js
 ```
 
 ## 本地校验
 
 ```bash
-node --check plugins/tasks/jiasuapi/1.0.1/plugin.js
-sha256sum plugins/tasks/jiasuapi/1.0.1/plugin.js   # 应与 index.json versions[].sha256 一致
+node --check plugins/tasks/jiasuapi/1.0.2/plugin.js
+sha256sum plugins/tasks/jiasuapi/1.0.2/plugin.js   # 应与 index.json versions[].sha256 一致
 ```
 
 若本机有 NewAPI 源码：
 
 ```bash
-go run . plugin lint /path/to/plugins/tasks/jiasuapi/1.0.1/plugin.js
+go run . plugin lint /path/to/plugins/tasks/jiasuapi/1.0.2/plugin.js
 ```

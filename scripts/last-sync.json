@@ -1,17 +1,18 @@
 {
-  "syncedAt": "2026-09-14T04:54:41.121Z",
+  "syncedAt": "2026-09-14T05:05:59.653Z",
   "base": "https://ai.jiasuapi.com",
-  "version": "1.0.1",
-  "source": "synced 10 from GET https://ai.jiasuapi.com/api/pricing (fallback; /v1/models: 401 Unauthorized (set JIASU_API_KEY for full /v1/models))",
+  "version": "1.0.2",
+  "source": "v1/models=8; extra-file=19 (scripts/db-models.snapshot.txt); api/pricing=10",
   "counts": {
-    "meta": 11,
+    "meta": 12,
     "video": 9,
-    "image": 2,
+    "image": 3,
     "unknown": 0
   },
   "models": [
     "gpt-image-2.5-1k",
     "gpt-image-2.5-sunburst-1k",
+    "jimeng-5.0",
     "sd-2.0-720",
     "sd-2.0-720-fast",
     "sd-2.0-933-720-fast-原生真人",
@@ -35,9 +36,44 @@
   ],
   "image": [
     "gpt-image-2.5-1k",
-    "gpt-image-2.5-sunburst-1k"
+    "gpt-image-2.5-sunburst-1k",
+    "jimeng-5.0"
   ],
   "unknown": [],
-  "sha256": "2d788b27451975f3a1a91c5bfd88039e492e7bf81bc6996f52e154400c9e54cc",
+  "skipped": [
+    {
+      "id": "face-style",
+      "reason": "force-exclude"
+    },
+    {
+      "id": "seedance-2.0-900-不重试",
+      "reason": "private-variant-not-in-v1"
+    },
+    {
+      "id": "seedance-2.0-933-不重试",
+      "reason": "private-variant-not-in-v1"
+    },
+    {
+      "id": "seedance-2.5-101010-KiLig",
+      "reason": "private-variant-not-in-v1"
+    },
+    {
+      "id": "seedance-2.5-101010-不重试",
+      "reason": "private-variant-not-in-v1"
+    },
+    {
+      "id": "seedance-2.5-301010-KiLig",
+      "reason": "private-variant-not-in-v1"
+    },
+    {
+      "id": "seedance-2.5-301010-不重试",
+      "reason": "private-variant-not-in-v1"
+    },
+    {
+      "id": "seedance-2.5-900-不重试",
+      "reason": "private-variant-not-in-v1"
+    }
+  ],
+  "sha256": "55e2eb3bae30d52bff9f9632ec5c366d7974de683874bad334232625f4da413d",
   "sunburst": true
 }
